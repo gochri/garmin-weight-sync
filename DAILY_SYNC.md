@@ -2,9 +2,110 @@
 
 `daily_sync` 是一个持续运行的 Docker 容器，用于自动每日同步体重数据到 Garmin Connect。
 
-## 前置
+## 前置要求
 
-### 构建镜像
+### 1. 配置文件准备
+
+#### 1.1 文件结构确认
+
+请确认项目目录下已有 `config/` 和 `data/` 文件夹，并按如下文件树：
+
+```tree
+garmin-weight-sync/
+├── config/
+│   ├── users.json          # 您的配置文件（含密码，与 xiaomi token）
+├── data/
+│   ├── .garth/         # 您的配置文件（garmin token）
+│   ├── garmin-fit/         # 生成的 FIT 文件
+│   ├── weight_data_*.json  # 数据备份
+│   └── sync.log            # 定时任务日志（如设置）
+```
+
+#### 1.2 配置文件创建
+
+如不存在，请先配置文件：
+
+1. 复制配置文件模板：
+
+```bash
+# Linux/Mac
+cp config/users.json.template config/users.json
+
+# Windows（在文件管理器中操作）
+# 进入 config 文件夹，复制 users.json 到 ./config
+```
+
+#### 1.3 配置文件填写
+
+2. 使用文本编辑器打开 `config/users.json`，填写您的账户信息：
+
+```json
+{
+    "users": [
+        {
+            "username": "您的手机号或邮箱",
+            "password": "小米账号密码",
+            "model": "yunmai.scales.ms103",
+            "token": {
+                "userId": "",
+                "passToken": "",
+                "ssecurity": ""
+            },
+            "garmin": {
+                "email": "您的佳明账号邮箱",
+                "password": "佳明账号密码",
+                "domain": "CN"
+            }
+        }
+    ]
+}
+```
+
+**重要参数说明：**
+
+| 参数 | 说明 | 示例值 |
+|------|------|--------|
+| `username` | 小米账号手机号或邮箱 | `13800138000` 或 `example@qq.com` |
+| `password` | 小米账号密码 | `your_password` |
+| `model` | 设备型号，小米体脂秤 S400 填此项 | `yunmai.scales.ms103` |
+| `garmin.domain` | 佳明服务器区域 | 中国区填 `CN`，国际区填 `COM` |
+| `token` | 首次留空，登录后自动填充 | 留空即可 |
+
+#### 1.4 首次登录授权
+
+3. 首次登录（获取小米/佳明授权）（请在构建镜像完成后执行）
+
+对小米授权：
+
+由于小米账号需要验证码登录，构建镜像后，第一次需要运行登录服务：
+
+```bash
+docker-compose --profile login run --rm login
+```
+
+**登录流程：**
+
+1. 程序会提示输入小米账号密码（已在配置文件中）
+2. 如果需要图形验证码，程序会自动在浏览器中打开验证码图片
+3. 看清验证码后，在终端中输入并回车
+4. 如果开启了二次验证（2FA），输入手机收到的 6 位验证码
+5. 登录成功后，程序会自动更新 `config/users.json` 中的 token 信息
+
+看到 `Login SUCCESS!` 提示后，表示授权成功，以后不需要再运行此步骤。
+
+对佳明授权：
+
+运行时，程序首先在同步前从 data/.garth/ 下读取持久化 garmin token，如不存在，则会自动更新并存储信息，故直接运行
+
+```bash
+docker-compose up -d daily_sync
+```
+
+即可
+
+### 2. 镜像构建
+
+#### 2.1 构建镜像
 
 如果项目更新了代码（如新增 `daily_sync.py`），需要本地构建镜像：
 
@@ -14,7 +115,7 @@ docker-compose build --no-cache
 
 构建完成后重新启动容器即可使用最新代码。
 
-### 删除镜像
+#### 2.2 删除镜像
 
 删除本地构建的镜像：
 
